@@ -1,0 +1,38 @@
+Resources:
+  FileUploadBucket:
+    Type: AWS::S3::Bucket
+    DependsOn: ETLFileProcessingQueuePolicy
+    Properties:
+      BucketName: ${self:custom.stage}-${self:service}-bucket
+      NotificationConfiguration:
+        QueueConfigurations:
+          - Event: s3:ObjectCreated:*
+            Queue:
+              Fn::GetAtt:
+                - ETLFileProcessingQueue
+                - Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: Reports/Sales/
+          - Event: s3:ObjectCreated:*
+            Queue:
+              Fn::GetAtt:
+                - ETLFileProcessingQueue
+                - Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: Reports/Inventory/
+          - Event: s3:ObjectCreated:*
+            Queue:
+              Fn::GetAtt:
+                - ETLFileProcessingQueue
+                - Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: Reports/Expense/

@@ -1,0 +1,23 @@
+Outputs:
+  S3BucketName:
+    Description: Name of the S3 bucket for file uploads
+    Value:
+      Ref: FileUploadBucket
+    Export:
+      Name: ${self:service}-${self:custom.stage}-bucket
+
+  SQSQueueUrl:
+    Description: URL of the SQS queue
+    Value:
+      Ref: ETLFileProcessingQueue
+    Export:
+      Name: ${self:service}-${self:custom.stage}-queue
+
+  SQSQueueArn:
+    Description: ARN of the SQS queue
+    Value:
+      Fn::GetAtt:
+        - ETLFileProcessingQueue
+        - Arn
+    Export:
+      Name: ${self:service}-${self:custom.stage}-queue-arn

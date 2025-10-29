@@ -1,0 +1,69 @@
+Resources:
+  ValidationResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: validation-results-${self:custom.stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: file_id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: file_id
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  ValidationRulesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: validation-rules-${self:custom.stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: report_type
+          AttributeType: S
+        - AttributeName: rule_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: report_type
+          KeyType: HASH
+        - AttributeName: rule_id
+          KeyType: RANGE
+
+  FileProcessingLogTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: file-processing-log-${self:custom.stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: file_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: file_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  ErrorDetailsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: error-details-${self:custom.stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: file_id
+          AttributeType: S
+        - AttributeName: error_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: file_id
+          KeyType: HASH
+        - AttributeName: error_id
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true

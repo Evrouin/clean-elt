@@ -1,0 +1,30 @@
+packagePatterns:
+  - '!node_modules/**'
+  - '!.git/**'
+  - '!.pytest_cache/**'
+  - '!tests/**'
+  - '!scripts/**'
+  - '!yaml/**'
+  - '!.gitignore'
+  - '!README.md'
+  - '!package.json'
+  - '!package-lock.json'
+  - '!.env*'
+  - 'src/**'
+
+stackTags:
+  Project: ${self:service}
+  Environment: ${self:custom.stage}
+  Owner: ${ssm:/${self:custom.stage}/${self:service}/OWNER, 'elway'}
+  CostCenter: ${ssm:/${self:custom.stage}/${self:service}/COST_CENTER, 'engineering'}
+  Purpose: data-quality-validation
+  ManagedBy: serverless-framework
+  CreatedDate: ${ssm:/${self:custom.stage}/${self:service}/CREATED_DATE, '2024-10-29'}
+
+resourceTags:
+  Project: ${self:service}
+  Environment: ${self:custom.stage}
+  Owner: ${ssm:/${self:custom.stage}/${self:service}/OWNER, 'elway'}
+  CostCenter: ${ssm:/${self:custom.stage}/${self:service}/COST_CENTER, 'engineering'}
+  Purpose: data-quality-validation
+  ManagedBy: serverless-framework

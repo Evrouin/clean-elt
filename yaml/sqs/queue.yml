@@ -1,0 +1,21 @@
+Resources:
+  ETLFileProcessingQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: etl-file-processing-${self:custom.stage}
+
+  ETLFileProcessingQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - Ref: ETLFileProcessingQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: sqs:SendMessage
+            Resource:
+              Fn::GetAtt:
+                - ETLFileProcessingQueue
+                - Arn

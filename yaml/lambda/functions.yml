@@ -1,0 +1,14 @@
+functions:
+  ReportProcessorHandler:
+    handler: src.handlers.report_processor.process_file
+    environment:
+      STAGE: ${self:custom.stage}
+      LOG_LEVEL: ${opt:log-level, 'INFO'}
+    layers:
+      - ${ssm:/${self:custom.stage}/${self:service}/LAYER_ARN}
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - ETLFileProcessingQueue
+              - Arn

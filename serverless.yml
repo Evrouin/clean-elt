@@ -1,0 +1,51 @@
+service: etl-data-quality-checker
+
+frameworkVersion: '3'
+
+plugins:
+  - serverless-python-requirements
+  - serverless-prune-plugin
+
+package:
+  patterns: ${file(yaml/custom.yml):packagePatterns}
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: ap-southeast-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 30
+  environment:
+    STAGE: ${self:custom.stage}
+  iam:
+    role: ${ssm:/${self:custom.stage}/${self:service}/EXECUTION_ROLE_ARN}
+  stackTags: ${file(yaml/custom.yml):stackTags}
+  tags: ${file(yaml/custom.yml):resourceTags}
+
+custom:
+  stage: ${self:provider.stage}
+  pythonRequirements:
+    useDownloadCache: true
+    useStaticCache: true
+    staticCacheMaxVersions: 2
+    slim: true
+    strip: false
+    dockerizePip: true
+    dockerImage: ${ssm:/${self:custom.stage}/${self:service}/DOCKER_IMAGE}
+    layer:
+      name: ${self:service}-${self:custom.stage}-deps
+      compatibleRuntimes:
+        - python3.11
+      retain: false
+  prune:
+    automatic: true
+    number: 3
+
+functions: ${file(yaml/lambda/functions.yml):functions}
+
+resources:
+  - ${file(yaml/s3/bucket.yml)}
+  - ${file(yaml/sqs/queue.yml)}
+  - ${file(yaml/dynamodb/tables.yml)}
+  - ${file(yaml/outputs/stack-outputs.yml)}
