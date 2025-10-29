@@ -22,10 +22,10 @@ class ReportProcessorHandler(BaseLambdaHandler):
             raise ValueError(f"Invalid SQS event format: {str(e)}")
 
     def process_request(self, request: SQSRequest) -> ProcessingResponse:
-        """Process reports with optimization"""
-        
+        """Process reports"""
+
         self.logger.info(
-            "Processing request with optimization",
+            "Processing request",
             total_records=len(request.records),
             request_id=request.request_id,
             memory_optimized=True
