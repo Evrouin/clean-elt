@@ -2,7 +2,7 @@ from typing import Dict, Any
 from src.processors.base import BaseProcessor
 from src.validators.inventory import InventoryValidator
 from src.models.reports.inventory import InventoryReport
-from src.utils.file_parser import FileParser
+from src.utils.memory_profiler import calculate_optimal_batch_size
 from src.models.enums import ReportType
 
 
@@ -19,10 +19,8 @@ class InventoryProcessor(BaseProcessor):
         """Optimized processing with memory management and performance tracking"""
         file_id = f"{bucket}/{key}"
 
-        memory_estimate = self.s3_service.estimate_processing_memory(bucket, key)
-        self.logger.info("Processing estimates", **memory_estimate)
-
-        batch_size = self._calculate_optimal_batch_size(memory_estimate['file_size_bytes'])
+        memory_estimate = self.file_utils.estimate_processing_memory(bucket, key)
+        batch_size = calculate_optimal_batch_size(memory_estimate['file_size_bytes'])
 
         processing_stats = {
             'file_id': file_id,
@@ -35,30 +33,38 @@ class InventoryProcessor(BaseProcessor):
         }
 
         try:
-            file_data = self.s3_service.get_object_content(bucket, key)
-
-            parsed_data = FileParser.parse_file_data(file_data, key)
-
             validation_results = []
-            for row_index, row_data in enumerate(parsed_data):
-                if not isinstance(row_data, dict):
-                    continue
+            row_index = 0
+            
+            for batch in self.file_utils.stream_csv_batches(bucket, key, batch_size):
+                processing_stats['batches_processed'] += 1
+                
+                for row_data in batch:
+                    row_index += 1
+                    
+                    # Ensure row_data is a dictionary
+                    if not isinstance(row_data, dict):
+                        self.logger.warning(f"Skipping non-dict row {row_index}: {type(row_data)}")
+                        continue
+                        
+                    # Transform data using model
+                    model = InventoryReport(file_name=key.split('/')[-1], bucket=bucket, key=key)
+                    transformed_data = model.transform_data(row_data)
 
-                model = InventoryReport(file_name=key.split('/')[-1], bucket=bucket, key=key)
-                transformed_data = model.transform_data(row_data)
+                    # Validate using optimized business rules
+                    validation_result = self.validate_with_business_rules('INVENTORY', transformed_data)
+                    validation_result['row_index'] = row_index
+                    
+                    # Update processing stats
+                    processing_stats['total_rows'] += 1
+                    if validation_result['is_valid']:
+                        processing_stats['valid_rows'] += 1
+                    else:
+                        processing_stats['invalid_rows'] += 1
+                        if validation_result['business_violations']:
+                            processing_stats['business_rule_violations'] += len(validation_result['business_violations'])
 
-                validation_result = self.validate_with_business_rules('INVENTORY', transformed_data)
-                validation_result['row_index'] = row_index + 1
-
-                processing_stats['total_rows'] += 1
-                if validation_result['is_valid']:
-                    processing_stats['valid_rows'] += 1
-                else:
-                    processing_stats['invalid_rows'] += 1
-                    if validation_result['business_violations']:
-                        processing_stats['business_rule_violations'] += len(validation_result['business_violations'])
-
-                validation_results.append(validation_result)
+                    validation_results.append(validation_result)
 
             self.cleanup()
 
@@ -87,16 +93,3 @@ class InventoryProcessor(BaseProcessor):
         """Quick validation check for essential fields"""
         required_fields = ['product_id', 'quantity_on_hand', 'reorder_level']
         return all(field in data and data[field] is not None for field in required_fields)
-
-    def get_performance_metrics(self) -> Dict[str, Any]:
-        """Get performance metrics for monitoring"""
-        base_metrics = {
-            'processor_type': 'OptimizedInventoryProcessor',
-            'cache_size': len(self._validator_cache),
-            'memory_optimized': True
-        }
-
-        if hasattr(self.business_rules, 'get_performance_stats'):
-            base_metrics.update(self.business_rules.get_performance_stats())
-
-        return base_metrics

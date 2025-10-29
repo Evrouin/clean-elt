@@ -4,15 +4,17 @@ import gc
 from functools import lru_cache
 from src.validators.business_rules import BusinessRulesValidator
 from src.services.aws.s3_service import S3Service
+from src.utils.file_processing import FileProcessingUtils
 from src.utils.logger import StructuredLogger
 
 
 class BaseProcessor(ABC):
-    """Abstract base class for all report processors"""
+    """Memory-optimized base processor with streaming and caching"""
 
     def __init__(self):
         self.logger = StructuredLogger(__name__)
         self.s3_service = S3Service()
+        self.file_utils = FileProcessingUtils()
         self._business_rules = None
         self._validator_cache = {}
 
@@ -36,6 +38,10 @@ class BaseProcessor(ABC):
         validator = self.get_cached_validator(report_type)
 
         field_errors = validator.validate(data)
+
+        # Convert string errors to dict format if needed
+        if field_errors and isinstance(field_errors[0], str):
+            field_errors = [{'field': 'validation', 'error': error, 'severity': 'ERROR'} for error in field_errors]
 
         business_violations = []
         if not field_errors or not any(e.get('severity') == 'CRITICAL' for e in field_errors):
@@ -61,6 +67,24 @@ class BaseProcessor(ABC):
     def get_model_class(self):
         """Return the appropriate model class for this processor"""
         pass
+
+    @abstractmethod
+    def _quick_validation_check(self, data: Dict[str, Any]) -> bool:
+        """Quick validation check for essential fields"""
+        pass
+
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Get performance metrics for monitoring"""
+        base_metrics = {
+            'processor_type': self.__class__.__name__,
+            'cache_size': len(self._validator_cache),
+            'memory_optimized': True
+        }
+
+        if hasattr(self.business_rules, 'get_performance_stats'):
+            base_metrics.update(self.business_rules.get_performance_stats())
+
+        return base_metrics
 
     def cleanup(self):
         """Cleanup resources and clear caches"""
