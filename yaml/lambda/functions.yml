@@ -4,6 +4,8 @@ functions:
     environment:
       STAGE: ${self:custom.stage}
       LOG_LEVEL: ${ssm:/${self:custom.stage}/${self:service}/LOG_LEVEL, 'INFO'}
+    memorySize: 2048
+    timeout: 900
     layers:
       - ${ssm:/${self:custom.stage}/${self:service}/LAYER_ARN}
     events:
