@@ -1,9 +1,8 @@
 from typing import Dict, Any, Optional
 from datetime import date
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from decimal import Decimal
 import re
-from .base import BaseReport
 
 
 class ExpenseReportData(BaseModel):
@@ -53,8 +52,37 @@ class ExpenseReportData(BaseModel):
             raise ValueError('Description cannot be empty')
         return v.strip()
 
+    @field_validator('approved_by')
+    @classmethod
+    def validate_approved_by(cls, v):
+        # Mock employee validation - simulate employee_master lookup
+        if not re.match(r'^EMP\d{3,}$', v):
+            raise ValueError('Approver ID must follow format EMPXXX')
+        # Simulate unauthorized approvers
+        unauthorized_approvers = ['EMP999', 'EMP888', 'EMP777']
+        if v in unauthorized_approvers:
+            raise ValueError(f'Employee {v} is not authorized to approve expenses')
+        return v
 
-class ExpenseReport(BaseReport):
+    @model_validator(mode='after')
+    def validate_large_expense_justification(self):
+        """Validate expenses > 10000 have justification"""
+        if self.amount > 10000:
+            if not self.justification or self.justification.strip() == '':
+                raise ValueError('Expenses above ₱10,000 require justification')
+        return self
+
+    @model_validator(mode='after')
+    def validate_salary_timing(self):
+        """Validate salary expenses occur during payroll periods"""
+        if self.category == "SALARY":
+            # Simulate payroll periods: 1-15 and 16-31 of each month
+            if not (1 <= self.date.day <= 15 or 16 <= self.date.day <= 31):
+                raise ValueError('Salary expenses should occur during payroll periods (1-15 or 16-31)')
+        return self
+
+
+class ExpenseReport(BaseModel):
     """Expense report model"""
 
     def get_validation_rules(self) -> Dict[str, Any]:
