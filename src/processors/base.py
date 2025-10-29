@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any
-from ..services.business_rules_service import BusinessRulesService
-from ..services.aws.s3_service import S3Service
+from src.validators.business_rules import BusinessRulesValidator
+from src.services.aws.s3_service import S3Service
 from src.models.dynamodb.validation_results import ValidationResults
 from src.models.dynamodb.file_processing_log import FileProcessingLog
 from src.models.dynamodb.error_details import ErrorDetails
@@ -12,7 +12,7 @@ class BaseProcessor(ABC):
 
     def __init__(self):
         self.s3_service = S3Service()
-        self.business_rules = BusinessRulesService()
+        self.business_rules = BusinessRulesValidator()
 
         # DynamoDB models
         self.validation_results = ValidationResults()

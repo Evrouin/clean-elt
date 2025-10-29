@@ -2,7 +2,7 @@ from typing import Dict, Any
 from .base import BaseLambdaHandler
 from src.models.requests.sqs_request import SQSRequest
 from src.models.responses.processing_response import ProcessingResponse
-from src.services.report_processing_service import ReportProcessingService
+from src.processors.report import ReportProcessor
 
 
 class ReportProcessorHandler(BaseLambdaHandler):
@@ -10,25 +10,26 @@ class ReportProcessorHandler(BaseLambdaHandler):
 
     def __init__(self):
         super().__init__()
-        self.processing_service = ReportProcessingService()
+        self.processor = ReportProcessor()
 
     def parse_request(self, event: Dict[str, Any], context: Any) -> SQSRequest:
         """Parse SQS event into structured request model"""
         try:
+            self.logger.debug("Parsing SQS event", event=event)
             return SQSRequest.from_sqs_event(event, context)
         except Exception as e:
             self.logger.error("Failed to parse SQS request", error=str(e))
             raise ValueError(f"Invalid SQS event format: {str(e)}")
 
     def process_request(self, request: SQSRequest) -> ProcessingResponse:
-        """Process reports using business logic service"""
+        """Process reports using report processor"""
         self.logger.info(
             "Processing request",
             total_records=len(request.records),
             request_id=request.request_id,
         )
 
-        results = self.processing_service.process_reports(request.records)
+        results = self.processor.process_reports(request.records)
 
         response = ProcessingResponse.create_success(results)
 
