@@ -1,11 +1,10 @@
 from typing import Dict, Any, List
 from decimal import Decimal
-from .base import BaseValidator
 from src.models.reports.inventory import InventoryReportData
 from pydantic import ValidationError
 
 
-class InventoryValidator(BaseValidator):
+class InventoryValidator:
     """Inventory report validator with field and business rules"""
 
     def validate(self, data: Dict[str, Any]) -> List[str]:

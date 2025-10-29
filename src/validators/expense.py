@@ -1,12 +1,11 @@
 from typing import Dict, Any, List
 from decimal import Decimal
 from datetime import date
-from .base import BaseValidator
 from src.models.reports.expense import ExpenseReportData
 from pydantic import ValidationError
 
 
-class ExpenseValidator(BaseValidator):
+class ExpenseValidator:
     """Expense report validator with field and business rules"""
 
     def validate(self, data: Dict[str, Any]) -> List[str]:
