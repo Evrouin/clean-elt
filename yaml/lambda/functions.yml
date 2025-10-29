@@ -3,7 +3,7 @@ functions:
     handler: src.handlers.report_processor.process_file
     environment:
       STAGE: ${self:custom.stage}
-      LOG_LEVEL: ${opt:log-level, 'INFO'}
+      LOG_LEVEL: ${ssm:/${self:custom.stage}/${self:service}/LOG_LEVEL, 'INFO'}
     layers:
       - ${ssm:/${self:custom.stage}/${self:service}/LAYER_ARN}
     events:
