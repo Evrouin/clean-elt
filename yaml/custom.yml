@@ -5,11 +5,17 @@ packagePatterns:
   - '!tests/**'
   - '!scripts/**'
   - '!yaml/**'
+  - '!mocks/**'
   - '!.gitignore'
   - '!README.md'
   - '!package.json'
   - '!package-lock.json'
   - '!.env*'
+  - '!**/__pycache__/**'
+  - '!**/*.pyc'
+  - '!**/*.pyo'
+  - '!**/*.pyd'
+  - '!**/.DS_Store'
   - 'src/**'
 
 stackTags:
