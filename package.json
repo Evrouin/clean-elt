@@ -1,0 +1,9 @@
+{
+  "name": "cleanelt",
+  "version": "1.0.0",
+  "description": "CleanELT Serverless Application",
+  "devDependencies": {
+    "serverless-prune-plugin": "^2.0.2",
+    "serverless-python-requirements": "^6.1.0"
+  }
+}

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.Python
+env/
+venv/
+
+# Serverless
+.serverless/
+node_modules/
+
+# AWS
+.aws-sam/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development tools
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+.bandit
+pip-tools/
+
+mocks/
+scripts/
+tests/
