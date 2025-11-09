@@ -1,5 +1,5 @@
 """
-Base exception classes for ETL Data Quality Checker
+Base exception classes for CleanELT
 """
 from typing import Dict, Any, Optional
 from src.utils.status_codes import ErrorCode, WarningCode

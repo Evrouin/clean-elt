@@ -1,5 +1,5 @@
 """
-Custom exceptions for ETL Data Quality Checker
+Custom exceptions for CleanELT
 """
 from .base import ETLException, ETLWarning
 from .file_processing import FileProcessingException, FileNotFoundError, InvalidFileFormatError

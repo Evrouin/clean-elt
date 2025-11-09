@@ -1,4 +1,4 @@
--- Redshift table schemas for ETL Data Quality Checker
+-- Redshift table schemas for CleanELT
 -- Usage: Execute this script in your Redshift cluster
 
 -- Sales Reports Table

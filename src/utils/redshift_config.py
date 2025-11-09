@@ -30,9 +30,9 @@ class RedshiftConfig:
 
         try:
             response = ssm.get_parameter(
-                Name=f'/{stage}/etl-data-quality-checker/EXECUTION_ROLE_ARN'
+                Name=f'/{stage}/cleanelt/EXECUTION_ROLE_ARN'
             )
             return response['Parameter']['Value']
         except Exception:
             account_id = boto3.client('sts').get_caller_identity()['Account']
-            return f"arn:aws:iam::{account_id}:role/etl-data-quality-checker-{stage}-execution-role"
+            return f"arn:aws:iam::{account_id}:role/cleanelt-{stage}-execution-role"

@@ -1,4 +1,4 @@
-service: etl-data-quality-checker
+service: cleanelt
 
 frameworkVersion: '3'
 

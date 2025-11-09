@@ -1,12 +1,12 @@
 """
-Error codes and standardized error messages for ETL Data Quality Checker
+Error codes and standardized error messages for CleanELT
 """
 from enum import Enum
 from typing import Dict, Any
 
 
 class InfoCode(Enum):
-    """Standardized info codes for the ETL Data Quality Checker"""
+    """Standardized info codes for CleanELT"""
     
     # General Info Codes (100-199)
     INFO_100 = "INFO_100"  # General informational log
@@ -18,7 +18,7 @@ class InfoCode(Enum):
 
 
 class SuccessCode(Enum):
-    """Standardized success codes for the ETL Data Quality Checker"""
+    """Standardized success codes for CleanELT"""
     
     # General Success Codes (200-299)
     SUCCESS_200 = "SUCCESS_200"  # OK / Success - General success
@@ -30,7 +30,7 @@ class SuccessCode(Enum):
 
 
 class ErrorCode(Enum):
-    """Standardized error codes for the ETL Data Quality Checker"""
+    """Standardized error codes for CleanELT"""
     
     # File Processing Errors (100-199)
     FILE_001 = "FILE_001"  # CSV streaming error
@@ -97,7 +97,7 @@ class ErrorCode(Enum):
 
 
 class WarningCode(Enum):
-    """Standardized warning codes for the ETL Data Quality Checker"""
+    """Standardized warning codes for CleanELT"""
     
     # File Processing Warnings (100-199)
     FILE_W101 = "FILE_W101"  # S3 access failed (using fallback)
