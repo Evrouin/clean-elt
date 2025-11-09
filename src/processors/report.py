@@ -28,6 +28,42 @@ class ReportProcessor:
                 processor = self.report_factory.create_processor(record.key)
                 result = processor.process(record.bucket, record.key)
 
+                redshift_result = None
+                valid_rows = result.get('valid_rows', 0)
+                self.logger.info("Checking Redshift integration trigger", 
+                               valid_rows=valid_rows, 
+                               result_keys=list(result.keys()),
+                               result_status=result.get('status'))
+                
+                if valid_rows > 0:
+                    self.logger.info("Triggering Redshift integration", valid_rows=valid_rows)
+                    try:
+                        from src.services.redshift_integration import RedshiftIntegration
+                        from src.models.enums import ReportType
+                        
+                        try:
+                            report_type = ReportType.from_s3_key(record.key)
+                            self.logger.info("Report type detected", report_type=report_type.name)
+                            
+                            redshift_integration = RedshiftIntegration()
+                            redshift_result = redshift_integration.copy_valid_data(
+                                s3_path=f"s3://{record.bucket}/{record.key}",
+                                report_type=report_type,
+                                validation_summary=result
+                            )
+                            redshift_integration.close()
+                            
+                            self.logger.info("Redshift integration completed", 
+                                           redshift_status=redshift_result.get('status'))
+                        except ValueError as ve:
+                            self.logger.warning(f"Unknown report type for key {record.key}: {ve}")
+                            
+                    except Exception as e:
+                        self.logger.error(f"Redshift integration failed: {e}")
+                        redshift_result = {'status': 'FAILED', 'error': str(e)}
+                else:
+                    self.logger.info("Skipping Redshift integration - no valid rows", valid_rows=valid_rows)
+
                 processing_result = FileProcessingResult(
                     report_type=record.key.split('/')[1].upper(),
                     file_location=f"s3://{record.bucket}/{record.key}",

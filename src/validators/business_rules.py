@@ -233,7 +233,16 @@ class BusinessRulesValidator:
         try:
             context = self._create_safe_context(data)
 
-            return eval(expression, {"__builtins__": {}}, context)
+            safe_builtins = {
+                'abs': abs,
+                'min': min,
+                'max': max,
+                'round': round,
+                'len': len,
+                'sum': sum
+            }
+
+            return eval(expression, {"__builtins__": safe_builtins}, context)
         except Exception as e:
             self.logger.error(f"Error evaluating comparison rule '{expression}': {e}")
             return False
@@ -261,21 +270,37 @@ class BusinessRulesValidator:
 
     def _create_safe_context(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a safe execution context with type conversion"""
-        from datetime import datetime, date
+        from datetime import datetime, date as date_class
 
         context = {}
 
         for field, value in data.items():
             if isinstance(value, str):
-                converted_value = self._convert_to_numeric(value)
-                context[field] = converted_value
+                if 'date' in field.lower() and len(value) >= 8:
+                    try:
+                        for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y']:
+                            try:
+                                parsed_date = datetime.strptime(value, fmt).date()
+                                context[field] = parsed_date
+                                break
+                            except ValueError:
+                                continue
+                        else:
+                            converted_value = self._convert_to_numeric(value)
+                            context[field] = converted_value
+                    except:
+                        converted_value = self._convert_to_numeric(value)
+                        context[field] = converted_value
+                else:
+                    converted_value = self._convert_to_numeric(value)
+                    context[field] = converted_value
             else:
                 context[field] = value
 
-        context.update({
-            'datetime': datetime,
-            'date': date
-        })
+        if 'datetime' not in context:
+            context['datetime'] = datetime
+        if 'date' not in context:
+            context['date_class'] = date_class
 
         return context
 
