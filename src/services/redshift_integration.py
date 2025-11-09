@@ -3,7 +3,8 @@ from src.services.aws.redshift_service import RedshiftService
 from src.services.aws.dynamodb_service import DynamoDBService
 from src.utils.redshift_config import RedshiftConfig
 from src.utils.copy_builder import CopyCommandBuilder
-from src.utils.logger import StructuredLogger
+from src.utils.error_logger import ErrorLogger
+from src.utils.status_codes import ErrorCode
 from src.models.enums import ReportType
 
 
@@ -11,7 +12,7 @@ class RedshiftIntegration:
     """Service for integrating validated data with Redshift"""
     
     def __init__(self):
-        self.logger = StructuredLogger(__name__)
+        self.logger = ErrorLogger(__name__)
         self.config = RedshiftConfig.get_config()
         self.redshift_service = RedshiftService(**self.config)
         self.dynamodb_service = DynamoDBService()
@@ -28,7 +29,12 @@ class RedshiftIntegration:
         try:
             # Only proceed if validation passed
             if validation_summary.get('status') != 'SUCCESS':
-                self.logger.info("Skipping Redshift COPY - validation failed")
+                self.logger.log_info(
+                    InfoCode.INFO_105,
+                    operation="redshift_copy",
+                    reason="validation_failed",
+                    validation_status=validation_summary.get('status'),
+                )
                 return {'status': 'SKIPPED', 'reason': 'validation_failed'}
             
             # Build COPY command
@@ -58,7 +64,13 @@ class RedshiftIntegration:
             return copy_result
             
         except Exception as e:
-            self.logger.error(f"Redshift COPY failed: {e}")
+            self.logger.log_error(
+                ErrorCode.RS_305,
+                exception=e,
+                s3_path=s3_path,
+                report_type=report_type.value,
+                operation="copy_valid_data",
+            )
             return {
                 'status': 'FAILED',
                 'error': str(e),
@@ -90,12 +102,22 @@ class RedshiftIntegration:
                 str(validation_summary.get('errors', []))
             ])
             
-            self.logger.info("Data quality audit logged", 
-                           source_file=source_file, 
-                           rows_loaded=copy_result.get('rows_loaded', 0))
+            self.logger.log_info(
+                InfoCode.INFO_100,
+                operation="data_quality_audit_logged",
+                source_file=source_file,
+                rows_loaded=copy_result.get('rows_loaded', 0),
+                table_name=table_name,
+            )
             
         except Exception as e:
-            self.logger.error(f"Failed to log audit record: {e}")
+            self.logger.log_error(
+                ErrorCode.RS_306,
+                exception=e,
+                source_file=source_file,
+                table_name=table_name,
+                operation="log_audit_record",
+            )
     
     def close(self):
         """Close connections"""

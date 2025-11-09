@@ -6,14 +6,15 @@ import boto3
 import psycopg2
 import psycopg2.pool
 
-from src.utils.logger import StructuredLogger
+from src.utils.error_logger import ErrorLogger
+from src.utils.status_codes import ErrorCode, WarningCode, SuccessCode, InfoCode
 
 
 class RedshiftService:
     """Service for Redshift database operations and COPY commands"""
 
     def __init__(self, cluster_endpoint: str = None, database: str = None, user: str = None, port: int = 5439):
-        self.logger = StructuredLogger(__name__)
+        self.logger = ErrorLogger(__name__)
         self.cluster_endpoint = cluster_endpoint or os.getenv('REDSHIFT_HOST')
         self.database = database or os.getenv('REDSHIFT_DATABASE')
         self.user = user or os.getenv('REDSHIFT_USER')
@@ -23,6 +24,13 @@ class RedshiftService:
     def _get_connection_pool(self):
         """Get or create connection pool for better resource management"""
         if self._connection_pool is None:
+            # Log connection pool initialization
+            self.logger.log_info(
+                InfoCode.INFO_101,
+                operation="connection_pool_creation",
+                cluster_endpoint=self.cluster_endpoint,
+            )
+            
             try:
                 redshift_client = boto3.client('redshift')
                 cluster_identifier = self.cluster_endpoint.split('.')[0]
@@ -44,10 +52,20 @@ class RedshiftService:
                     password=response['DbPassword']
                 )
 
-                self.logger.info("Redshift connection pool created")
+                # Log connection success
+                self.logger.log_success(
+                    SuccessCode.SUCCESS_201,
+                    resource_type="connection_pool",
+                    cluster_endpoint=self.cluster_endpoint,
+                )
 
             except Exception as e:
-                self.logger.error(f"Failed to create connection pool: {e}")
+                self.logger.log_error(
+                    ErrorCode.RS_301,
+                    exception=e,
+                    cluster_endpoint=self.cluster_endpoint,
+                    database=self.database,
+                )
                 raise
 
         return self._connection_pool
@@ -67,11 +85,13 @@ class RedshiftService:
 
         start_time = self.logger.get_timestamp()
 
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-
-                self.logger.info(f"Executing COPY command for table {table_name}")
+                # Log COPY command initialization
+                self.logger.log_info(
+                    InfoCode.INFO_102,
+                    operation="copy_command_execution",
+                    table_name=table_name,
+                    s3_path=s3_path,
+                )
 
                 source_file = s3_path.split('/')[-1]
 
@@ -151,11 +171,24 @@ class RedshiftService:
                     'copy_command': copy_sql.strip()
                 }
 
-                self.logger.info("COPY command completed successfully", **result)
+                # Log COPY success
+                self.logger.log_success(
+                    SuccessCode.SUCCESS_200,
+                    operation="copy_command",
+                    table_name=table_name,
+                    rows_loaded=result.get('rows_loaded', 0),
+                    duration_ms=result.get('duration_ms', 0),
+                )
                 return result
 
         except Exception as e:
-            self.logger.error(f"COPY command failed: {e}")
+            self.logger.log_error(
+                ErrorCode.RS_302,
+                exception=e,
+                table_name=table_name,
+                s3_path=s3_path,
+                operation="copy_command",
+            )
             return {
                 'status': 'FAILED',
                 'table_name': table_name,
@@ -186,7 +219,12 @@ class RedshiftService:
                 return results
 
         except Exception as e:
-            self.logger.error(f"Query execution failed: {e}")
+            self.logger.log_error(
+                ErrorCode.RS_303,
+                exception=e,
+                query=query[:100] + "..." if len(query) > 100 else query,
+                operation="execute_query",
+            )
             raise
 
     def execute_manifest_copy(self, table_name: str, manifest_s3_path: str, iam_role: str) -> Dict[str, Any]:
@@ -232,7 +270,13 @@ class RedshiftService:
                 }
 
         except Exception as e:
-            self.logger.error(f"Manifest COPY failed: {e}")
+            self.logger.log_error(
+                ErrorCode.RS_304,
+                exception=e,
+                table_name=table_name,
+                manifest_path=manifest_s3_path,
+                operation="manifest_copy",
+            )
             return {
                 'status': 'FAILED',
                 'table_name': table_name,
@@ -246,6 +290,13 @@ class RedshiftService:
             try:
                 self._connection_pool.closeall()
                 self._connection_pool = None
-                self.logger.info("Redshift connection pool closed")
+                self.logger.log_info(
+                    InfoCode.INFO_102,
+                    operation="redshift_connection_pool_closed",
+                )
             except Exception as e:
-                self.logger.warning(f"Error closing connection pool: {e}")
+                self.logger.log_warning(
+                    WarningCode.SYS_W801,
+                    error_message=str(e),
+                    operation="close_connection_pool",
+                )

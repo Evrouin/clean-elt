@@ -16,7 +16,6 @@ class SalesProcessor(BaseProcessor):
         return SalesReport
 
     def process(self, bucket: str, key: str) -> Dict[str, Any]:
-        """Optimized processing with memory management and performance tracking"""
         file_id = f"{bucket}/{key}"
 
         memory_estimate = self.file_utils.estimate_processing_memory(bucket, key)
@@ -35,13 +34,13 @@ class SalesProcessor(BaseProcessor):
         try:
             validation_results = []
             row_index = 0
-            
+
             for batch in self.file_utils.stream_csv_batches(bucket, key, batch_size):
                 processing_stats['batches_processed'] += 1
-                
+
                 for row_data in batch:
                     row_index += 1
-                    
+
                     if not isinstance(row_data, dict):
                         continue
 
@@ -68,7 +67,19 @@ class SalesProcessor(BaseProcessor):
             return processing_stats
 
         except Exception as e:
-            self.logger.error(f"Sales processing failed: {e}")
+            from src.utils.error_logger import ErrorLogger
+            from src.utils.status_codes import ErrorCode
+
+            error_logger = ErrorLogger(__name__)
+            error_logger.log_processing_error(
+                ErrorCode.DATA_401,
+                report_type="sales",
+                processing_stage="main_processing",
+                exception=e,
+                bucket=bucket,
+                key=key,
+                rows_processed=processing_stats['total_rows'],
+            )
             processing_stats['status'] = 'FAILED'
             processing_stats['error'] = str(e)
             return processing_stats

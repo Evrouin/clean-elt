@@ -4,14 +4,15 @@ from src.models.reports.factory import ReportFactory
 from src.models.requests.sqs_request import S3EventRecord
 from src.models.responses.processing_response import FileProcessingResult
 from src.utils.batch_copy import BatchCopyManager
-from src.utils.logger import StructuredLogger
+from src.utils.error_logger import ErrorLogger
+from src.utils.status_codes import ErrorCode, WarningCode, SuccessCode, InfoCode
 
 
 class ReportProcessor:
     """Main report processor that coordinates file processing"""
 
     def __init__(self):
-        self.logger = StructuredLogger(__name__)
+        self.logger = ErrorLogger(__name__)
         self.report_factory = ReportFactory()
         self.batch_copy_manager = BatchCopyManager()
 
@@ -20,8 +21,18 @@ class ReportProcessor:
         results = []
 
         for record in s3_records:
-            self.logger.info(
-                "Processing S3 file",
+            # Log processing initialization
+            self.logger.log_info(
+                InfoCode.INFO_101,
+                operation="file_processing",
+                bucket=record.bucket,
+                key=record.key,
+            )
+            
+            # Log file processing start
+            self.logger.log_info(
+                InfoCode.INFO_102,
+                operation="s3_file_processing",
                 bucket=record.bucket,
                 key=record.key,
                 size=record.size,
@@ -31,22 +42,45 @@ class ReportProcessor:
                 processor = self.report_factory.create_processor(record.key)
                 result = processor.process(record.bucket, record.key)
 
+                # Log processing success
+                self.logger.log_processing_success(
+                    SuccessCode.SUCCESS_200,
+                    report_type=record.key.split('/')[1] if '/' in record.key else 'unknown',
+                    processing_stage="file_processing",
+                    total_rows=result.get('total_rows', 0),
+                    valid_rows=result.get('valid_rows', 0),
+                )
+
                 redshift_result = None
                 valid_rows = result.get('valid_rows', 0)
-                self.logger.info("Checking Redshift integration trigger",
-                                 valid_rows=valid_rows,
-                                 result_keys=list(result.keys()),
-                                 result_status=result.get('status'))
+                
+                # Log integration check
+                self.logger.log_info(
+                    InfoCode.INFO_102,
+                    operation="redshift_integration_check",
+                    valid_rows=valid_rows,
+                    result_keys=list(result.keys()),
+                    result_status=result.get('status'),
+                )
 
                 if valid_rows > 0:
-                    self.logger.info("Triggering Redshift integration", valid_rows=valid_rows)
+                    self.logger.log_info(
+                        InfoCode.INFO_104,
+                        operation="redshift_integration_triggered",
+                        valid_rows=valid_rows,
+                    )
                     try:
                         from src.models.enums import ReportType
                         from src.services.redshift_integration import RedshiftIntegration
 
                         try:
                             report_type = ReportType.from_s3_key(record.key)
-                            self.logger.info("Report type detected", report_type=report_type.name)
+                            self.logger.log_info(
+                                InfoCode.INFO_100,
+                                operation="report_type_detection",
+                                report_type=report_type.name,
+                                file_key=record.key,
+                            )
 
                             redshift_integration = RedshiftIntegration()
                             redshift_result = redshift_integration.copy_valid_data(
@@ -56,16 +90,44 @@ class ReportProcessor:
                             )
                             redshift_integration.close()
 
-                            self.logger.info("Redshift integration completed",
-                                             redshift_status=redshift_result.get('status'))
+                            self.logger.log_info(
+                                InfoCode.INFO_100,
+                                operation="redshift_integration_completed",
+                                redshift_status=redshift_result.get('status'),
+                                rows_loaded=redshift_result.get('rows_loaded', 0),
+                            )
+                            
+                            # Log integration success
+                            if redshift_result.get('status') == 'SUCCESS':
+                                self.logger.log_success(
+                                    SuccessCode.SUCCESS_200,
+                                    operation="redshift_integration",
+                                    rows_loaded=redshift_result.get('rows_loaded', 0),
+                                )
                         except ValueError as ve:
-                            self.logger.warning(f"Unknown report type for key {record.key}: {ve}")
+                            self.logger.log_warning(
+                                WarningCode.DATA_W401,
+                                file_key=record.key,
+                                error_message=str(ve),
+                            )
 
                     except Exception as e:
-                        self.logger.error(f"Redshift integration failed: {e}")
+                        self.logger.log_error(
+                            ErrorCode.RS_305,
+                            exception=e,
+                            bucket=record.bucket,
+                            key=record.key,
+                            valid_rows=valid_rows,
+                        )
                         redshift_result = {'status': 'FAILED', 'error': str(e)}
                 else:
-                    self.logger.info("Skipping Redshift integration - no valid rows", valid_rows=valid_rows)
+                    # Log skipping integration
+                    self.logger.log_info(
+                        InfoCode.INFO_105,
+                        operation="redshift_integration",
+                        reason="no_valid_rows",
+                        valid_rows=valid_rows,
+                    )
 
                 processing_result = FileProcessingResult(
                     report_type=record.key.split('/')[1].upper(),
@@ -81,7 +143,11 @@ class ReportProcessor:
 
                 if hasattr(processor, 'get_performance_metrics'):
                     metrics = processor.get_performance_metrics()
-                    self.logger.info("Processor performance metrics", **metrics)
+                    self.logger.log_info(
+                        InfoCode.INFO_100,
+                        operation="performance_metrics",
+                        **metrics,
+                    )
 
                 if hasattr(processor, 'cleanup'):
                     processor.cleanup()
@@ -106,13 +172,31 @@ class ReportProcessor:
                 )
                 results.append(failed_result)
 
-        self.logger.info(
-            "Batch processing completed",
-            files_processed=len(s3_records)
+        # Log batch processing completion
+        self.logger.log_info(
+            InfoCode.INFO_100,
+            operation="batch_processing_completed",
+            files_processed=len(s3_records),
         )
+        
+        # Log batch processing success
+        successful_files = len([r for r in results if r.status == 'SUCCESS'])
+        if successful_files > 0:
+            self.logger.log_batch_success(
+                SuccessCode.SUCCESS_200,
+                operation_type="batch_processing",
+                file_count=len(s3_records),
+                successful_files=successful_files,
+            )
 
         # Execute batch COPY if multiple valid files
         if len(results) > 1:
+            # Log batch processing initialization
+            self.logger.log_info(
+                InfoCode.INFO_101,
+                operation="batch_processing",
+                file_count=len(results),
+            )
             self._execute_batch_copy(s3_records, results)
 
         return results
@@ -139,10 +223,18 @@ class ReportProcessor:
                             }
                         })
                     except ValueError:
-                        self.logger.warning(f"Unknown report type for batch processing: {record.key}")
+                        self.logger.log_warning(
+                            WarningCode.DATA_W402,
+                            file_key=record.key,
+                            operation="batch_processing",
+                        )
 
             if len(file_batches) > 1:
-                self.logger.info(f"Executing batch COPY for {len(file_batches)} files")
+                self.logger.log_info(
+                    InfoCode.INFO_102,
+                    operation="batch_copy_execution",
+                    file_count=len(file_batches),
+                )
 
                 # Use manifest-based batch copy for multiple files
                 manifest_bucket = s3_records[0].bucket  # Use same bucket for manifest
@@ -152,14 +244,36 @@ class ReportProcessor:
                     report_type=file_batches[0]['report_type']  # Group by first type
                 )
 
-                self.logger.info("Batch COPY completed",
-                                 status=batch_results.get('status'),
-                                 total_files=batch_results.get('total_files'))
+                self.logger.log_info(
+                    InfoCode.INFO_100,
+                    operation="batch_copy_completed",
+                    status=batch_results.get('status'),
+                    total_files=batch_results.get('total_files'),
+                )
+                
+                # Log batch COPY success
+                if batch_results.get('status') == 'SUCCESS':
+                    self.logger.log_batch_success(
+                        SuccessCode.SUCCESS_200,
+                        operation_type="batch_copy",
+                        file_count=batch_results.get('total_files'),
+                    )
             else:
-                self.logger.info("Skipping batch COPY - insufficient files for batching")
+                # Log skipping batch COPY
+                self.logger.log_info(
+                    InfoCode.INFO_105,
+                    operation="batch_copy",
+                    reason="insufficient_files",
+                    file_count=len(file_batches),
+                )
 
         except Exception as e:
-            self.logger.error(f"Batch COPY execution failed: {e}")
+            self.logger.log_batch_error(
+                ErrorCode.BATCH_703,
+                operation_type="batch_execution",
+                exception=e,
+                file_count=len(s3_records),
+            )
 
     def process_single_file(self, bucket: str, key: str) -> FileProcessingResult:
         """Process a single file"""
@@ -184,7 +298,14 @@ class ReportProcessor:
             return processing_result
 
         except Exception as e:
-            self.logger.error(f"Single file processing failed: {e}")
+            self.logger.log_processing_error(
+                ErrorCode.DATA_404,
+                report_type="unknown",
+                processing_stage="single_file",
+                exception=e,
+                bucket=bucket,
+                key=key,
+            )
 
             return FileProcessingResult(
                 report_type=key.split('/')[1].upper() if '/' in key else 'UNKNOWN',
@@ -240,7 +361,11 @@ class ReportProcessor:
                         grouped_files[report_type] = []
                     grouped_files[report_type].append(s3_path)
                 except ValueError:
-                    self.logger.warning(f"Skipping unknown report type: {key}")
+                    self.logger.log_warning(
+                        WarningCode.DATA_W402,
+                        file_key=key,
+                        operation="manifest_processing",
+                    )
 
             results = {}
             for report_type, paths in grouped_files.items():
@@ -253,7 +378,12 @@ class ReportProcessor:
                     )
                     results[report_type.value] = result
                 else:
-                    self.logger.info(f"Single file for {report_type.value}, using regular processing")
+                    self.logger.log_info(
+                        InfoCode.INFO_100,
+                        operation="single_file_processing",
+                        report_type=report_type.value,
+                        reason="single_file_only",
+                    )
 
             return {
                 'status': 'SUCCESS',
@@ -262,7 +392,12 @@ class ReportProcessor:
             }
 
         except Exception as e:
-            self.logger.error(f"Batch manifest processing failed: {e}")
+            self.logger.log_batch_error(
+                ErrorCode.BATCH_704,
+                operation_type="manifest_processing",
+                exception=e,
+                file_count=len(s3_paths),
+            )
             return {
                 'status': 'FAILED',
                 'error': str(e)

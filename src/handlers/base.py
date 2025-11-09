@@ -46,7 +46,15 @@ class BaseLambdaHandler(ABC):
 
     def handle_error(self, error: Exception) -> Dict[str, Any]:
         """Standardized error handling"""
-        self.logger.error("Handler error", error=str(error), error_type=type(error).__name__)
+        from src.utils.error_logger import ErrorLogger
+        from src.utils.status_codes import ErrorCode
+        
+        error_logger = ErrorLogger(__name__)
+        error_logger.log_error(
+            ErrorCode.REQ_603,
+            exception=error,
+            error_type=type(error).__name__,
+        )
         return {
             'statusCode': 500,
             'body': json.dumps({

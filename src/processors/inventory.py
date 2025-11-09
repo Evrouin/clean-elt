@@ -16,7 +16,6 @@ class InventoryProcessor(BaseProcessor):
         return InventoryReport
 
     def process(self, bucket: str, key: str) -> Dict[str, Any]:
-        """Optimized processing with memory management and performance tracking"""
         file_id = f"{bucket}/{key}"
 
         memory_estimate = self.file_utils.estimate_processing_memory(bucket, key)
@@ -35,26 +34,35 @@ class InventoryProcessor(BaseProcessor):
         try:
             validation_results = []
             row_index = 0
-            
+
             for batch in self.file_utils.stream_csv_batches(bucket, key, batch_size):
                 processing_stats['batches_processed'] += 1
-                
+
                 for row_data in batch:
                     row_index += 1
-                    
+
                     # Ensure row_data is a dictionary
                     if not isinstance(row_data, dict):
-                        self.logger.warning(f"Skipping non-dict row {row_index}: {type(row_data)}")
+                        from src.utils.error_logger import ErrorLogger
+                        from src.utils.status_codes import WarningCode
+
+                        error_logger = ErrorLogger(__name__)
+                        error_logger.log_warning(
+                            WarningCode.FILE_W102,
+                            row_index=row_index,
+                            row_type=type(row_data).__name__,
+                            expected_type="dict",
+                        )
                         continue
-                        
+
                     # Transform data using model
                     model = InventoryReport(file_name=key.split('/')[-1], bucket=bucket, key=key)
                     transformed_data = model.transform_data(row_data)
 
-                    # Validate using optimized business rules
+                    # Validate using business rules
                     validation_result = self.validate_with_business_rules('INVENTORY', transformed_data)
                     validation_result['row_index'] = row_index
-                    
+
                     # Update processing stats
                     processing_stats['total_rows'] += 1
                     if validation_result['is_valid']:
@@ -73,7 +81,19 @@ class InventoryProcessor(BaseProcessor):
             return processing_stats
 
         except Exception as e:
-            self.logger.error(f"Inventory processing failed: {e}")
+            from src.utils.error_logger import ErrorLogger
+            from src.utils.status_codes import ErrorCode
+
+            error_logger = ErrorLogger(__name__)
+            error_logger.log_processing_error(
+                ErrorCode.DATA_402,
+                report_type="inventory",
+                processing_stage="main_processing",
+                exception=e,
+                bucket=bucket,
+                key=key,
+                rows_processed=processing_stats['total_rows'],
+            )
             processing_stats['status'] = 'FAILED'
             processing_stats['error'] = str(e)
             return processing_stats

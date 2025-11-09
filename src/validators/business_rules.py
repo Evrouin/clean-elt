@@ -2,7 +2,8 @@ from typing import Dict, List, Any, Optional
 import re
 from functools import lru_cache
 from src.models.dynamodb.validation_rules import ValidationRules
-from src.utils.logger import StructuredLogger
+from src.utils.error_logger import ErrorLogger
+from src.utils.status_codes import ErrorCode, WarningCode
 
 
 class BusinessRulesValidator:
@@ -10,14 +11,14 @@ class BusinessRulesValidator:
 
     def __init__(self):
         self.validation_rules = ValidationRules()
-        self.logger = StructuredLogger(__name__)
+        self.logger = ErrorLogger(__name__)
         self._rules_cache = {}
         self._compiled_expressions = {}
         self._rule_priorities = {}
         self._fast_fail_enabled = True
 
     @lru_cache(maxsize=128)
-    def get_rules_optimized(self, report_type: str) -> List[Dict[str, Any]]:
+    def get_rules(self, report_type: str) -> List[Dict[str, Any]]:
         """Get rules with priority sorting for optimal execution order"""
         rules = self.get_rules(report_type)
 
@@ -40,7 +41,7 @@ class BusinessRulesValidator:
 
     def execute_rules(self, report_type: str, data: Dict[str, Any]) -> List[Dict[str, str]]:
         """Execute rules with performance optimizations and fast-fail"""
-        rules = self.get_rules_optimized(report_type)
+        rules = self.get_rules(report_type)
         violations = []
 
         for rule in rules:
@@ -64,11 +65,21 @@ class BusinessRulesValidator:
                     violations.append(violation_detail)
 
                     if self._fast_fail_enabled and rule.get('severity') == 'CRITICAL':
-                        self.logger.warning(f"Fast-fail triggered on critical rule: {rule_id}")
+                        self.logger.log_warning(
+                            WarningCode.RULE_W501,
+                            rule_id=rule_id,
+                            critical_error=str(e),
+                        )
                         break
 
             except Exception as e:
-                self.logger.error(f"Rule execution failed for {rule_id}: {e}")
+                self.logger.log_rule_error(
+                    ErrorCode.RULE_501,
+                    rule_id=rule_id,
+                    rule_type=rule.get('rule_type', 'unknown'),
+                    exception=e,
+                    expression=rule.get('expression'),
+                )
 
         return violations
 
@@ -143,7 +154,7 @@ class BusinessRulesValidator:
         return None
 
     def _evaluate_rule(self, rule: Dict[str, Any], data: Dict[str, Any]) -> bool:
-        """Evaluate a single rule expression against data with enhanced error handling"""
+        """Evaluate a single rule expression against data with error handling"""
         rule_expression = rule['rule_expression']
         validation_type = rule.get('validation_type', 'BUSINESS')
         rule_id = rule.get('rule_id', 'UNKNOWN')
@@ -156,18 +167,28 @@ class BusinessRulesValidator:
             else:
                 return self._evaluate_expression_rule(rule_expression, data)
         except Exception as e:
-            self.logger.error(f"Rule evaluation failed for {rule_id}: {e}",
-                            extra={'rule': rule, 'data_keys': list(data.keys())})
+            self.logger.log_rule_error(
+                ErrorCode.RULE_502,
+                rule_id=rule_id,
+                rule_type=validation_type,
+                exception=e,
+                expression=rule_expression,
+                data_keys=list(data.keys()),
+            )
             return False
 
     def _evaluate_range_rule(self, expression: str, data: Dict[str, Any]) -> bool:
-        """Evaluate range rules with enhanced numeric conversion"""
+        """Evaluate range rules with numeric conversion"""
         try:
             expression = expression.strip()
             parts = re.split(r'\s*(>=|<=|!=|==|>|<)\s*', expression)
 
             if len(parts) != 3:
-                self.logger.warning(f"Invalid range expression format: {expression}")
+                self.logger.log_warning(
+                    WarningCode.RULE_W502,
+                    expression=expression,
+                    expected_format="field_name:min_value:max_value",
+                )
                 return False
 
             field, operator, value = parts
@@ -192,12 +213,18 @@ class BusinessRulesValidator:
                 return comparisons[operator](field_value, value)
 
         except Exception as e:
-            self.logger.error(f"Error evaluating range rule '{expression}': {e}")
+            self.logger.log_rule_error(
+                ErrorCode.RULE_504,
+                rule_id="range_rule",
+                rule_type="RANGE",
+                exception=e,
+                expression=expression,
+            )
 
         return False
 
     def _convert_to_numeric(self, value: Any) -> Any:
-        """Enhanced numeric conversion with datetime handling"""
+        """Numeric conversion with datetime handling"""
         from datetime import datetime
 
         if isinstance(value, (int, float)):
@@ -229,7 +256,7 @@ class BusinessRulesValidator:
         return value
 
     def _evaluate_comparison_rule(self, expression: str, data: Dict[str, Any]) -> bool:
-        """Evaluate field comparison rules with enhanced safety"""
+        """Evaluate field comparison rules with safety"""
         try:
             context = self._create_safe_context(data)
 
@@ -244,11 +271,17 @@ class BusinessRulesValidator:
 
             return eval(expression, {"__builtins__": safe_builtins}, context)
         except Exception as e:
-            self.logger.error(f"Error evaluating comparison rule '{expression}': {e}")
+            self.logger.log_rule_error(
+                ErrorCode.RULE_505,
+                rule_id="comparison_rule",
+                rule_type="COMPARISON",
+                exception=e,
+                expression=expression,
+            )
             return False
 
     def _evaluate_expression_rule(self, expression: str, data: Dict[str, Any]) -> bool:
-        """Evaluate custom Python expressions with enhanced safety"""
+        """Evaluate custom Python expressions with safety"""
         try:
             context = self._create_safe_context(data)
 
@@ -265,7 +298,13 @@ class BusinessRulesValidator:
 
             return eval(expression, {"__builtins__": {}}, context)
         except Exception as e:
-            self.logger.error(f"Error evaluating expression rule '{expression}': {e}")
+            self.logger.log_rule_error(
+                ErrorCode.RULE_506,
+                rule_id="expression_rule",
+                rule_type="BUSINESS",
+                exception=e,
+                expression=expression,
+            )
             return False
 
     def _create_safe_context(self, data: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,6 +1,7 @@
 import boto3
 from botocore.exceptions import ClientError
-from src.utils.logger import StructuredLogger
+from src.utils.error_logger import ErrorLogger
+from src.utils.status_codes import ErrorCode
 
 
 class S3Service:
@@ -8,14 +9,21 @@ class S3Service:
 
     def __init__(self):
         self.client = boto3.client('s3')
-        self.logger = StructuredLogger(__name__)
+        self.logger = ErrorLogger(__name__)
 
     def get_object(self, bucket: str, key: str) -> dict:
         """Get object from S3"""
         try:
             return self.client.get_object(Bucket=bucket, Key=key)
         except ClientError as e:
-            self.logger.error(f"Failed to get object: {e}")
+            self.logger.log_aws_error(
+                ErrorCode.AWS_202,
+                service="s3",
+                operation="get_object",
+                exception=e,
+                bucket=bucket,
+                key=key,
+            )
             raise
 
     def get_object_content(self, bucket: str, key: str) -> str:
@@ -24,7 +32,14 @@ class S3Service:
             response = self.client.get_object(Bucket=bucket, Key=key)
             return response['Body'].read().decode('utf-8')
         except ClientError as e:
-            self.logger.error(f"Failed to get object content: {e}")
+            self.logger.log_aws_error(
+                ErrorCode.AWS_202,
+                service="s3",
+                operation="get_object_content",
+                exception=e,
+                bucket=bucket,
+                key=key,
+            )
             raise
 
     def put_object(self, bucket: str, key: str, body: bytes, content_type: str = None) -> dict:
@@ -35,7 +50,14 @@ class S3Service:
                 params['ContentType'] = content_type
             return self.client.put_object(**params)
         except ClientError as e:
-            self.logger.error(f"Failed to put object: {e}")
+            self.logger.log_aws_error(
+                ErrorCode.AWS_203,
+                service="s3",
+                operation="put_object",
+                exception=e,
+                bucket=bucket,
+                key=key,
+            )
             raise
 
     def delete_object(self, bucket: str, key: str) -> dict:
@@ -43,7 +65,14 @@ class S3Service:
         try:
             return self.client.delete_object(Bucket=bucket, Key=key)
         except ClientError as e:
-            self.logger.error(f"Failed to delete object: {e}")
+            self.logger.log_aws_error(
+                ErrorCode.AWS_204,
+                service="s3",
+                operation="delete_object",
+                exception=e,
+                bucket=bucket,
+                key=key,
+            )
             raise
 
     def head_object(self, bucket: str, key: str) -> dict:
@@ -51,7 +80,14 @@ class S3Service:
         try:
             return self.client.head_object(Bucket=bucket, Key=key)
         except ClientError as e:
-            self.logger.error(f"Failed to get object metadata: {e}")
+            self.logger.log_aws_error(
+                ErrorCode.AWS_207,
+                service="s3",
+                operation="get_object_metadata",
+                exception=e,
+                bucket=bucket,
+                key=key,
+            )
             raise
 
     def list_objects(self, bucket: str, prefix: str = None, max_keys: int = 1000) -> dict:
@@ -62,7 +98,14 @@ class S3Service:
                 params['Prefix'] = prefix
             return self.client.list_objects_v2(**params)
         except ClientError as e:
-            self.logger.error(f"Failed to list objects: {e}")
+            self.logger.log_aws_error(
+                ErrorCode.AWS_206,
+                service="s3",
+                operation="list_objects",
+                exception=e,
+                bucket=bucket,
+                prefix=prefix,
+            )
             raise
 
     def copy_object(self, source_bucket: str, source_key: str, dest_bucket: str, dest_key: str) -> dict:
@@ -75,7 +118,16 @@ class S3Service:
                 Key=dest_key
             )
         except ClientError as e:
-            self.logger.error(f"Failed to copy object: {e}")
+            self.logger.log_aws_error(
+                ErrorCode.AWS_205,
+                service="s3",
+                operation="copy_object",
+                exception=e,
+                source_bucket=source_bucket,
+                source_key=source_key,
+                dest_bucket=dest_bucket,
+                dest_key=dest_key,
+            )
             raise
 
     def object_exists(self, bucket: str, key: str) -> bool:

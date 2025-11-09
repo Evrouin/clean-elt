@@ -9,7 +9,7 @@ from src.utils.logger import StructuredLogger
 
 
 class BaseProcessor(ABC):
-    """Memory-optimized base processor with streaming and caching"""
+    """Base processor with streaming and caching"""
 
     def __init__(self):
         self.logger = StructuredLogger(__name__)
@@ -33,7 +33,7 @@ class BaseProcessor(ABC):
         return self._validator_cache[report_type]
 
     def validate_with_business_rules(self, report_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Optimized validation with minimal memory footprint"""
+        """Validation with minimal memory footprint"""
 
         validator = self.get_cached_validator(report_type)
 

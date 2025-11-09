@@ -7,14 +7,15 @@ import boto3
 from src.models.enums import ReportType
 from src.services.aws.redshift_service import RedshiftService
 from src.services.redshift_integration import RedshiftIntegration
-from src.utils.logger import StructuredLogger
+from src.utils.error_logger import ErrorLogger
+from src.utils.status_codes import ErrorCode, SuccessCode, InfoCode
 
 
 class BatchCopyManager:
     """Manager for batch COPY operations to Redshift"""
 
     def __init__(self, max_workers: int = 3):
-        self.logger = StructuredLogger(__name__)
+        self.logger = ErrorLogger(__name__)
         self.max_workers = max_workers
         self.s3_client = boto3.client('s3')
 
@@ -23,6 +24,13 @@ class BatchCopyManager:
         file_batches: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """Execute batch COPY operations for multiple files"""
+
+        # Log batch operation initialization
+        self.logger.log_info(
+            InfoCode.INFO_101,
+            operation="batch_copy_files",
+            file_count=len(file_batches),
+        )
 
         results = []
 
@@ -37,11 +45,27 @@ class BatchCopyManager:
                 try:
                     result = future.result()
                     results.append(result)
-                    self.logger.info("Batch COPY completed",
-                                     file=batch.get('s3_path'),
-                                     status=result.get('status'))
+                    self.logger.log_info(
+                        InfoCode.INFO_103,
+                        operation="batch_copy_completed",
+                        file=batch.get('s3_path'),
+                        status=result.get('status'),
+                    )
+                    
+                    # Log batch success
+                    if result.get('status') == 'SUCCESS':
+                        self.logger.log_success(
+                            SuccessCode.SUCCESS_200,
+                            operation="batch_copy",
+                            file_path=batch.get('s3_path'),
+                        )
                 except Exception as e:
-                    self.logger.error(f"Batch COPY failed: {e}")
+                    self.logger.log_batch_error(
+                        ErrorCode.BATCH_701,
+                        operation_type="batch_copy",
+                        exception=e,
+                        file_path=batch.get('s3_path'),
+                    )
                     results.append({
                         'status': 'FAILED',
                         'error': str(e),
@@ -93,7 +117,12 @@ class BatchCopyManager:
             }
 
         except Exception as e:
-            self.logger.error(f"Batch COPY with manifest failed: {e}")
+            self.logger.log_batch_error(
+                ErrorCode.BATCH_702,
+                operation_type="manifest_copy",
+                exception=e,
+                file_count=len(file_batches),
+            )
             return {
                 'status': 'FAILED',
                 'error': str(e)
@@ -168,7 +197,13 @@ class BatchCopyManager:
                 redshift_service.close_connection()
 
         except Exception as e:
-            self.logger.error(f"Manifest COPY failed: {e}")
+            self.logger.log_batch_error(
+                ErrorCode.BATCH_705,
+                operation_type="manifest_operation",
+                exception=e,
+                file_count=len(files),
+                manifest_path=manifest_s3_path,
+            )
             return {
                 'status': 'FAILED',
                 'error': str(e),
