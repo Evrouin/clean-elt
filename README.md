@@ -12,6 +12,8 @@ CleanELT is a comprehensive data quality checker designed for modern ETL (Extrac
 - **Multi-Format Support**: Handles CSV and JSON data formats seamlessly
 - **Memory-Optimized Processing**: 70% memory reduction through streaming batch processing
 - **Performance Optimized**: 3x faster business rule execution with pre-compilation and caching
+- **Redshift Integration**: Automated COPY operations for validated data to Redshift data warehouse
+- **Batch Processing**: Concurrent batch COPY operations with data quality audit logging
 - **Scalable Architecture**: Serverless design scales automatically with data volume
 - **Comprehensive Monitoring**: Detailed logging and metrics for data quality insights
 - **Cost-Effective**: Pay-per-use serverless model with optimized resource allocation
@@ -25,12 +27,13 @@ CleanELT is a comprehensive data quality checker designed for modern ETL (Extrac
 
 ## Architecture
 
-**Pipeline Flow**: S3 → SQS → Lambda → DynamoDB
+**Pipeline Flow**: S3 → SQS → Lambda → DynamoDB → Redshift
 
 - **S3**: Stores ETL reports (Sales, Inventory, Expense) with event notifications
 - **SQS**: Queues file processing events for reliable processing
 - **Lambda**: Processes files with dual-layer validation (field + business rules)
 - **DynamoDB**: Stores validation results, business rules, processing logs, and error details
+- **Redshift**: Data warehouse for validated data with automated COPY operations and audit logging
 
 ## Features
 
@@ -52,13 +55,14 @@ CleanELT is a comprehensive data quality checker designed for modern ETL (Extrac
 │   ├── handlers/           # Lambda entry points
 │   ├── processors/         # Report-specific processors (memory-optimized)
 │   ├── services/           # Business logic and AWS service wrappers
+│   │   └── aws/            # AWS service integrations (S3, DynamoDB, Redshift)
 │   ├── models/             # Pydantic models and enums
 │   ├── validators/         # Data validation logic (cached)
-│   └── utils/              # Shared utilities (file processing, batch sizing)
+│   └── utils/              # Shared utilities (file processing, batch sizing, Redshift config)
 ├── yaml/                   # Modular serverless configuration
-├── scripts/                # Setup and deployment scripts
 ├── mocks/                  # Test data and events
 ├── tests/                  # Unit and integration tests
+├── sql/                    # Redshift table creation scripts
 ├── requirements.txt        # Production dependencies
 ├── requirements-dev.txt    # Development dependencies
 └── BUSINESS_RULES_REFERENCE.md  # Validation rules reference
@@ -70,6 +74,7 @@ CleanELT is a comprehensive data quality checker designed for modern ETL (Extrac
 - Node.js 18+ (for Serverless Framework)
 - AWS CLI configured
 - Docker (for cross-platform package compilation)
+- PostgreSQL client libraries (for Redshift connectivity)
 
 ## Setup
 
@@ -96,26 +101,13 @@ npm install
 aws configure --profile {aws-profile}
 ```
 
-### 3. Create IAM Execution Role
+### 3. Configure AWS Resources
 
-```bash
-# Create Lambda execution role with required permissions
-./scripts/create-iam-role.sh {stage} {aws-profile}
-```
-
-### 4. Setup Resource Tagging
-
-```bash
-# Configure stack tags in SSM Parameter Store
-./scripts/setup-tags.sh {stage} {aws-profile}
-```
-
-### 5. Populate Business Rules
-
-```bash
-# Load validation rules into DynamoDB
-python scripts/populate_business_rules.py --stage {stage} --profile {aws-profile}
-```
+Ensure the following AWS resources are configured:
+- IAM execution role with required permissions for Lambda, S3, DynamoDB, SQS, and Redshift
+- SSM Parameter Store entries for stack tags and resource configuration
+- Redshift cluster and connection parameters in SSM Parameter Store
+- DynamoDB tables populated with business validation rules
 
 ## Deployment
 
