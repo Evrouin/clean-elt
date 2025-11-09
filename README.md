@@ -1,270 +1,185 @@
 # CleanELT
 
-A serverless data quality validation platform for ETL pipelines, ensuring data integrity and compliance through automated validation workflows.
+A serverless data quality validation platform for ETL pipelines that ensures data integrity through automated validation workflows.
 
-## Project Summary
+## Overview
 
-CleanELT is a comprehensive data quality checker designed for modern ETL (Extract, Load, Transform) pipelines. It provides real-time validation of data files as they arrive in your data lake, ensuring data quality standards are met before downstream processing begins.
+CleanELT provides real-time validation of data files as they arrive in your data lake, ensuring quality standards are met before downstream processing. Built on AWS serverless architecture for automatic scaling and cost optimization.
 
-**Key Capabilities:**
-- **Automated Validation**: Validates data files automatically upon S3 upload
-- **Dual-Layer Validation**: Combines structural field validation with configurable business rules
-- **Multi-Format Support**: Handles CSV and JSON data formats seamlessly
-- **Memory-Optimized Processing**: 70% memory reduction through streaming batch processing
-- **Performance Optimized**: 3x faster business rule execution with pre-compilation and caching
-- **Redshift Integration**: Automated COPY operations for validated data to Redshift data warehouse
-- **Batch Processing**: Concurrent batch COPY operations with data quality audit logging
-- **Scalable Architecture**: Serverless design scales automatically with data volume
-- **Comprehensive Monitoring**: Detailed logging and metrics for data quality insights
-- **Cost-Effective**: Pay-per-use serverless model with optimized resource allocation
+### Key Features
 
-**Use Cases:**
-- Data lake ingestion quality gates
-- ETL pipeline data validation checkpoints
-- Regulatory compliance data verification
-- Data warehouse pre-processing validation
-- Real-time data quality monitoring
+- **Automated Validation**: Real-time file processing on S3 upload
+- **Dual-Layer Validation**: Structural field validation + configurable business rules
+- **Multi-Format Support**: CSV and JSON processing
+- **Memory Optimized**: 70% memory reduction through streaming batch processing
+- **Performance Optimized**: 3x faster execution with rule pre-compilation and caching
+- **Redshift Integration**: Automated COPY operations for validated data
+- **Comprehensive Logging**: Structured logging with 49+ standardized status codes
 
-## Architecture
-
-**Pipeline Flow**: S3 → SQS → Lambda → DynamoDB → Redshift
-
-- **S3**: Stores ETL reports (Sales, Inventory, Expense) with event notifications
-- **SQS**: Queues file processing events for reliable processing
-- **Lambda**: Processes files with dual-layer validation (field + business rules)
-- **DynamoDB**: Stores validation results, business rules, processing logs, and error details
-- **Redshift**: Data warehouse for validated data with automated COPY operations and audit logging
-
-## Features
-
-- **Multi-format Support**: CSV and JSON file processing with streaming optimization
-- **Dual Validation**: Pydantic field validation + DynamoDB business rules
-- **Memory Optimization**: Streaming CSV processing with smart batch sizing (50-500 rows)
-- **Performance Caching**: LRU cache for business rules with 85% hit ratio
-- **Fast-fail Logic**: Critical errors stop processing immediately
-- **Stage-based Deployment**: dev, uat, stg, prd environments
-- **Structured Logging**: Contextual logging with request tracking
-- **Error Handling**: Comprehensive error capture and storage
-- **Resource Tagging**: Automated cost tracking and resource management
-- **Lambda Layers**: Optimized package size with dependency layers
-
-## Project Structure
+### Architecture
 
 ```
-├── src/
-│   ├── handlers/           # Lambda entry points
-│   ├── processors/         # Report-specific processors (memory-optimized)
-│   ├── services/           # Business logic and AWS service wrappers
-│   │   └── aws/            # AWS service integrations (S3, DynamoDB, Redshift)
-│   ├── models/             # Pydantic models and enums
-│   ├── validators/         # Data validation logic (cached)
-│   └── utils/              # Shared utilities (file processing, batch sizing, Redshift config)
-├── yaml/                   # Modular serverless configuration
-├── mocks/                  # Test data and events
-├── tests/                  # Unit and integration tests
-├── sql/                    # Redshift table creation scripts
-├── requirements.txt        # Production dependencies
-├── requirements-dev.txt    # Development dependencies
-└── BUSINESS_RULES_REFERENCE.md  # Validation rules reference
+S3 → SQS → Lambda → DynamoDB → Redshift
 ```
 
-## Prerequisites
+- **S3**: File storage with event notifications
+- **SQS**: Reliable event queuing
+- **Lambda**: Serverless processing with dual validation
+- **DynamoDB**: Validation rules, results, and audit logs
+- **Redshift**: Data warehouse for validated data
+
+## Quick Start
+
+### Prerequisites
 
 - Python 3.11+
-- Node.js 18+ (for Serverless Framework)
+- Node.js 18+
 - AWS CLI configured
-- Docker (for cross-platform package compilation)
-- PostgreSQL client libraries (for Redshift connectivity)
+- Docker (for package compilation)
 
-## Setup
-
-### 1. Install Dependencies
+### Installation
 
 ```bash
 # Install Serverless Framework
 npm install -g serverless
 
-# Install Python dependencies (includes boto3 for local development)
+# Install dependencies
 pip install -r requirements.txt
-
-# Install development dependencies (optional)
-pip install -r requirements-dev.txt
-
-# Install Serverless plugins
 npm install
-```
 
-### 2. Configure AWS Profile
-
-```bash
-# Configure AWS profile for your target environment
+# Configure AWS
 aws configure --profile {aws-profile}
 ```
 
-### 3. Configure AWS Resources
-
-Ensure the following AWS resources are configured:
-- IAM execution role with required permissions for Lambda, S3, DynamoDB, SQS, and Redshift
-- SSM Parameter Store entries for stack tags and resource configuration
-- Redshift cluster and connection parameters in SSM Parameter Store
-- DynamoDB tables populated with business validation rules
-
-## Deployment
-
-### Deploy to Development
+### Deployment
 
 ```bash
+# Deploy to development
 sls deploy --stage dev --aws-profile {aws-profile}
 ```
 
-## Testing
-
-### Local Testing
+### Testing
 
 ```bash
-# Test with mock SQS events
-sls invoke local --function ReportProcessorHandler --path ./mocks/events/sqs-sales-event.json --aws-profile {aws-profile}
-sls invoke local --function ReportProcessorHandler --path ./mocks/events/sqs-inventory-event.json --aws-profile {aws-profile}
-sls invoke local --function ReportProcessorHandler --path ./mocks/events/sqs-expense-event.json --aws-profile {aws-profile}
-```
+# Local testing
+sls invoke local --function ReportProcessorHandler --path ./mocks/events/sqs-sales-event.json
 
-### Remote Testing
-
-```bash
-# Test deployed Lambda function
-sls invoke --function ReportProcessorHandler --path ./mocks/events/sqs-sales-event.json --stage {stage} --aws-profile {aws-profile}
+# Remote testing
+sls invoke --function ReportProcessorHandler --path ./mocks/events/sqs-sales-event.json --stage dev
 ```
 
 ## Configuration
 
 ### Environment Variables
 
-- `STAGE`: Deployment stage (dev/uat/stg/prd)
+- `STAGE`: Deployment environment (dev/uat/stg/prd)
 
 ### SSM Parameters
 
-The application uses SSM Parameter Store for configuration:
+Configure these parameters in AWS Systems Manager:
 
-- `/{stage}/etl-data-quality-checker/EXECUTION_ROLE_ARN`: Lambda execution role
-- `/{stage}/etl-data-quality-checker/DOCKER_IMAGE`: Docker image for package compilation
-- `/{stage}/etl-data-quality-checker/OWNER`: Resource owner tag
-- `/{stage}/etl-data-quality-checker/COST_CENTER`: Cost center tag
-- `/{stage}/etl-data-quality-checker/CREATED_DATE`: Creation date tag
+```
+/{stage}/cleanelt/EXECUTION_ROLE_ARN
+/{stage}/cleanelt/DOCKER_IMAGE
+/{stage}/cleanelt/OWNER
+/{stage}/cleanelt/COST_CENTER
+/{stage}/cleanelt/CREATED_DATE
+```
 
 ### Business Rules
 
-Validation rules are stored in DynamoDB `validation-rules` table:
-
+Validation rules are stored in DynamoDB with three types:
 - **RANGE**: Numeric range validation
-- **COMPARISON**: Field comparison validation
+- **COMPARISON**: Field comparison validation  
 - **BUSINESS**: Custom business logic validation
 
-See `BUSINESS_RULES_REFERENCE.md` for detailed rule specifications and examples.
+See [BUSINESS_RULES_REFERENCE.md](BUSINESS_RULES_REFERENCE.md) for detailed specifications.
 
 ## Supported Report Types
 
-### Sales Reports
-- **Path**: `Reports/Sales/`
-- **Fields**: transaction_id, product_id, quantity, unit_price, total_amount, transaction_date
-- **Formats**: CSV, JSON
-- **Sample Rules**: 6 business rules including amount calculations and range validations
+| Report Type | Path | Formats | Business Rules |
+|-------------|------|---------|----------------|
+| Sales | `Reports/Sales/` | CSV, JSON | 6 rules (amount calculations, ranges) |
+| Inventory | `Reports/Inventory/` | CSV, JSON | 6 rules (stock levels, reorder points) |
+| Expense | `Reports/Expense/` | CSV, JSON | 4 rules (amount limits, categories) |
 
-### Inventory Reports
-- **Path**: `Reports/Inventory/`
-- **Fields**: product_id, product_name, category, quantity_on_hand, reorder_level, last_updated
-- **Formats**: CSV, JSON
-- **Sample Rules**: 6 business rules including stock level and reorder validations
+## Project Structure
 
-### Expense Reports
-- **Path**: `Reports/Expense/`
-- **Fields**: expense_id, employee_id, category, amount, expense_date, description
-- **Formats**: CSV, JSON
-- **Sample Rules**: 4 business rules including amount limits and category validations
+```
+src/
+├── handlers/           # Lambda entry points
+├── processors/         # Report-specific processors
+├── services/           # Business logic and AWS integrations
+├── models/             # Pydantic models (reports, requests, responses)
+├── validators/         # Data validation logic
+├── exceptions/         # Custom exception classes
+└── utils/              # Logging, batch processing, utilities
 
-## Performance Optimization
+yaml/                   # Serverless configuration
+mocks/                  # Test data and events
+tests/                  # Unit and integration tests
+sql/                    # Redshift table schemas
+```
 
-### Memory Optimization
-- **Streaming Processing**: 70% memory reduction through batch processing
-- **Smart Batch Sizing**: File-size based batching (50-500 rows)
-- **Lambda Layers**: Dependencies separated to reduce function size
-- **Optimized Requirements**: Lambda uses optimized dependencies (excludes boto3)
+## Logging System
 
-### Processing Performance
-- **Rule Pre-compilation**: 3x faster business rule execution
-- **LRU Caching**: 85% cache hit ratio for compiled rules
-- **Fast-fail Logic**: Critical errors stop processing immediately
-- **Batch Processing**: Optimized for memory and throughput
+CleanELT uses structured logging with standardized status codes:
 
-### Package Optimization
-- **Function Size**: ~75MB (optimized from 95MB+)
-- **Layer Size**: Dependencies in separate layer
-- **Exclusions**: Aggressive exclusion of unnecessary files
-- **Docker Compilation**: Cross-platform compatibility
+```python
+# Info logging
+self.logger.log_info(InfoCode.INFO_101, operation="file_processing", file_path=path)
 
-## Monitoring
+# Success logging  
+self.logger.log_success(SuccessCode.SUCCESS_200, operation="batch_copy", rows_processed=1000)
 
-### CloudWatch Logs
+# Warning logging
+self.logger.log_warning(WarningCode.DATA_W401, operation="validation", invalid_rows=5)
 
-- Lambda execution logs with structured logging
-- Error tracking and debugging information
-- Performance metrics and processing statistics
-- Memory usage and batch processing metrics
+# Error logging
+self.logger.log_error(ErrorCode.FILE_001, exception=e, file_path=path)
+```
 
-### DynamoDB Tables
+**Status Code Categories:**
+- **Error Codes**: 30+ codes across 8 categories (FILE, AWS, RS, DATA, RULE, REQ, BATCH, SYS)
+- **Warning Codes**: System and operational warnings
+- **Success Codes**: Positive outcome tracking (SUCCESS_200-205)
+- **Info Codes**: Process flow information (INFO_100-105)
 
-- `validation-results`: Detailed validation results per file/row
-- `validation-rules`: Business validation rules with pre-compiled expressions
-- `file-processing-log`: Processing status and performance metrics
-- `error-details`: Error details and stack traces
+## Performance
 
-### Performance Metrics
+### Optimization Features
+- **Memory**: Streaming processing with smart batch sizing (50-500 rows)
+- **Speed**: Rule pre-compilation with 85% cache hit ratio
+- **Package**: ~75MB function size with Lambda layers
+- **Processing**: Target < 5 seconds per batch
 
-- **Processing Time**: Target < 5 seconds per batch
-- **Memory Usage**: Optimized for 512MB Lambda allocation
-- **Cache Performance**: 85% hit ratio for business rules
-- **Validation Rate**: Tracks valid vs invalid row percentages
-
-## Cost Optimization
-
-- **Lambda**: Pay-per-execution with optimized 512MB memory allocation
-- **Lambda Layers**: Shared dependencies reduce individual function costs
-- **DynamoDB**: On-demand billing for variable workloads
-- **S3**: Standard storage with lifecycle policies
-- **SQS**: Pay-per-message with dead letter queue
-- **Optimized Processing**: Reduced execution time through performance improvements
-
-## Security
-
-- **IAM**: Least privilege access with specific resource permissions
-- **VPC**: Optional VPC deployment for network isolation
-- **Encryption**: Server-side encryption for S3 and DynamoDB
-- **Secrets**: SSM Parameter Store for sensitive configuration
-- **Dependency Management**: Separate requirements files for different environments
+### Monitoring
+- CloudWatch logs with structured output
+- DynamoDB tables for validation results and audit trails
+- Performance metrics tracking
 
 ## Development
 
 ### Adding New Report Types
 
-1. Create processor in `src/processors/` (inherit from BaseProcessor)
+1. Create processor in `src/processors/`
 2. Add validator in `src/validators/`
 3. Create Pydantic model in `src/models/reports/`
-4. Update `ReportType` enum in `src/models/enums.py`
-5. Add S3 path configuration in serverless YAML
+4. Update `ReportType` enum
+5. Configure S3 paths in serverless YAML
 6. Add business rules to DynamoDB
-7. Update `BUSINESS_RULES_REFERENCE.md` with new rule specifications
 
 ### Local Development
 
 ```bash
-# Install development dependencies
+# Install dev dependencies
 pip install -r requirements-dev.txt
 
-# Run tests with AWS mocking
+# Run tests
 pytest tests/
 
-# Format code
-black src/
-isort src/
+# Code formatting
+black src/ && isort src/
 
 # Type checking
 mypy src/
@@ -273,53 +188,55 @@ mypy src/
 bandit -r src/
 ```
 
-### Testing Framework
-
-- **Unit Tests**: Individual component testing
-- **Integration Tests**: End-to-end processing with moto AWS mocking
-- **Business Rule Tests**: Validation logic verification
-
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Import Errors**: Ensure Python path includes `src/` directory
-2. **Permission Errors**: Verify IAM role has required permissions
-3. **Package Size Errors**: Use Lambda layers and optimized requirements
-4. **Memory Errors**: Check batch sizing and streaming configuration
-5. **Region Errors**: Ensure AWS CLI and serverless.yml use same region
+| Issue | Solution |
+|-------|----------|
+| Import Errors | Ensure Python path includes `src/` directory |
+| Permission Errors | Verify IAM role permissions |
+| Package Size | Use Lambda layers and optimized requirements |
+| Memory Errors | Check batch sizing configuration |
 
 ### Debug Commands
 
 ```bash
-# Check CloudWatch logs
-sls logs --function ReportProcessorHandler --stage {stage} --aws-profile {aws-profile}
+# View logs
+sls logs --function ReportProcessorHandler --stage {stage}
 
-# Validate serverless configuration
-sls print --stage {stage} --aws-profile {aws-profile}
+# Validate configuration
+sls print --stage {stage}
 
-# Check DynamoDB tables
-aws dynamodb list-tables --profile {aws-profile} --region ap-southeast-1
-
-# Test local processing
-python -m pytest tests/integration/ -v
+# Test locally
+pytest tests/integration/ -v
 ```
 
-### Performance Debugging
+## Security
 
-```bash
-# Check function performance metrics
-aws logs filter-log-events --log-group-name /aws/lambda/etl-data-quality-checker-{stage}-ReportProcessorHandler --profile {aws-profile}
+- **IAM**: Least privilege access
+- **Encryption**: Server-side encryption for S3 and DynamoDB
+- **Secrets**: SSM Parameter Store for configuration
+- **VPC**: Optional network isolation
 
-# Monitor memory usage
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Duration --dimensions Name=FunctionName,Value=etl-data-quality-checker-{stage}-ReportProcessorHandler --start-time 2025-10-29T00:00:00Z --end-time 2025-10-29T23:59:59Z --period 3600 --statistics Average --profile {aws-profile}
-```
+## Cost Optimization
 
----
+- Pay-per-execution serverless model
+- Optimized memory allocation (512MB)
+- Lambda layers for shared dependencies
+- On-demand DynamoDB billing
+
+## Contributing
+
+This is a personal project. If you'd like to contribute:
+
+1. Fork the repository at [https://github.com/Evrouin/clean-elt](https://github.com/Evrouin/clean-elt)
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
 
 ## Documentation
 
-- **`BUSINESS_RULES_REFERENCE.md`**: Comprehensive validation rules reference with sample implementations
-- **`README.md`**: This file - setup, deployment, and usage guide
-- **Code Documentation**: Inline documentation in source code
-- **API Documentation**: Generated from Pydantic models and handlers
+- [Business Rules Reference](BUSINESS_RULES_REFERENCE.md) - Validation rules and examples
+- Inline code documentation throughout the codebase
