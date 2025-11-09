@@ -18,6 +18,9 @@ provider:
   timeout: 30
   environment:
     STAGE: ${self:custom.stage}
+    REDSHIFT_HOST: ${ssm:/${self:custom.stage}/${self:service}/REDSHIFT_HOST}
+    REDSHIFT_DATABASE: ${ssm:/${self:custom.stage}/${self:service}/REDSHIFT_DATABASE}
+    REDSHIFT_USER: ${ssm:/${self:custom.stage}/${self:service}/REDSHIFT_USER}
   iam:
     role: ${ssm:/${self:custom.stage}/${self:service}/EXECUTION_ROLE_ARN}
   stackTags: ${file(yaml/custom.yml):stackTags}

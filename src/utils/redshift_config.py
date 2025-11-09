@@ -10,7 +10,7 @@ class RedshiftConfig:
     def get_config() -> Dict[str, Any]:
         """Get Redshift configuration from environment variables"""
         return {
-            'cluster_endpoint': os.getenv('REDSHIFT_CLUSTER_ENDPOINT'),
+            'cluster_endpoint': os.getenv('REDSHIFT_HOST'),
             'database': os.getenv('REDSHIFT_DATABASE'),
             'user': os.getenv('REDSHIFT_USER'),
             'port': int(os.getenv('REDSHIFT_PORT'))

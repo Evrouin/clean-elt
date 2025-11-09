@@ -10,7 +10,7 @@ class RedshiftService:
 
     def __init__(self, cluster_endpoint: str = None, database: str = None, user: str = None, port: int = 5439):
         self.logger = StructuredLogger(__name__)
-        self.cluster_endpoint = cluster_endpoint or os.getenv('REDSHIFT_CLUSTER_ENDPOINT')
+        self.cluster_endpoint = cluster_endpoint or os.getenv('REDSHIFT_HOST')
         self.database = database or os.getenv('REDSHIFT_DATABASE')
         self.user = user or os.getenv('REDSHIFT_USER')
         self.port = port
