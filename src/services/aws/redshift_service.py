@@ -85,13 +85,13 @@ class RedshiftService:
 
         start_time = self.logger.get_timestamp()
 
-                # Log COPY command initialization
-                self.logger.log_info(
-                    InfoCode.INFO_102,
-                    operation="copy_command_execution",
-                    table_name=table_name,
-                    s3_path=s3_path,
-                )
+        # Log COPY command initialization
+        self.logger.log_info(
+            InfoCode.INFO_102,
+            operation="copy_command_execution",
+            table_name=table_name,
+            s3_path=s3_path,
+        )
 
                 source_file = s3_path.split('/')[-1]
 
